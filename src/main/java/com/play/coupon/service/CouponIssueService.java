@@ -1,6 +1,7 @@
 package com.play.coupon.service;
 
 import com.play.coupon.domain.Coupon;
+import com.play.coupon.domain.IssuedCoupon;
 import com.play.coupon.repository.CouponRepository;
 import com.play.coupon.repository.IssuedCouponRepository;
 import jakarta.transaction.Transactional;
@@ -25,6 +26,7 @@ public class CouponIssueService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰입니다."));
 
         coupon.issue();
+        issuedCouponRepository.save(new IssuedCoupon(couponId, userId));
     }
 
 }
