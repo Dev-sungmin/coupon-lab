@@ -5,14 +5,20 @@ import com.play.coupon.domain.IssuedCoupon;
 import com.play.coupon.repository.CouponRepository;
 import com.play.coupon.repository.IssuedCouponRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
 
 @Service
 @RequiredArgsConstructor
 public class CouponIssueService {
     private final CouponRepository couponRepository;
     private final IssuedCouponRepository issuedCouponRepository;
+    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisScript<Long> couponIssueScript;
 
     @Transactional
     public Long create(String name, int totalQuantity) {
@@ -22,11 +28,21 @@ public class CouponIssueService {
 
     @Transactional
     public void issue(Long couponId, Long userId){
-        Coupon coupon = couponRepository.findByIdWithLock(couponId)
+        Coupon coupon = couponRepository.findById(couponId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰입니다."));
 
-        coupon.issue();
-        issuedCouponRepository.save(new IssuedCoupon(couponId, userId));
-    }
+        String key = "coupon:" + couponId + ":count";
+        Long result = redisTemplate.execute(
+                couponIssueScript,
+                Collections.singletonList(key),
+                String.valueOf(coupon.getTotalQuantity())
+        );
 
+        if (result.equals(-1L)) {
+            throw new IllegalStateException("쿠폰이 모두 소진되었습니다.");
+        }
+
+        issuedCouponRepository.save(new IssuedCoupon(couponId, userId));
+        couponRepository.incrementIssuedQuantity(couponId);
+    }
 }
