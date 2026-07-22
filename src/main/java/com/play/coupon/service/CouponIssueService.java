@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,22 +24,19 @@ public class CouponIssueService {
     @Transactional
     public Long create(String name, int totalQuantity) {
         Coupon coupon = couponRepository.save(new Coupon(name, totalQuantity));
+        redisTemplate.opsForValue().set("coupon:" + coupon.getId() + ":total", String.valueOf(totalQuantity));
         return coupon.getId();
     }
 
     @Transactional
     public void issue(Long couponId, Long userId){
-        Coupon coupon = couponRepository.findById(couponId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰입니다."));
+        List<String> keys = List.of("coupon:" + couponId + ":count", "coupon:" + couponId + ":total");
+        Long result = redisTemplate.execute(couponIssueScript, keys);
 
-        String key = "coupon:" + couponId + ":count";
-        Long result = redisTemplate.execute(
-                couponIssueScript,
-                Collections.singletonList(key),
-                String.valueOf(coupon.getTotalQuantity())
-        );
-
-        if (result.equals(-1L)) {
+        if(result.equals(-2L)){
+            throw new IllegalArgumentException("존재하지 않는 쿠폰입니다.");
+        }
+        if(result.equals(-1L)){
             throw new IllegalStateException("쿠폰이 모두 소진되었습니다.");
         }
 
