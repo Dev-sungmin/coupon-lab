@@ -18,4 +18,8 @@ public interface CouponRepository extends JpaRepository<Coupon, Long>{
     @Modifying
     @Query("UPDATE Coupon c SET c.issuedQuantity = c.issuedQuantity + 1 WHERE c.id = :id")
     void incrementIssuedQuantity(@Param("id") Long id);
+
+    @Modifying
+    @Query("UPDATE Coupon c SET c.issuedQuantity = c.issuedQuantity + :count WHERE c.id = :id")
+    void incrementIssuedQuantityBy(@Param("id") Long id, @Param("count") int count);
 }
